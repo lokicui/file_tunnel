@@ -1,0 +1,20 @@
+#file tunnel configure file
+#usage: %s [options] IP User Passwd SrcPath DstPath 
+#  [opt]:
+#      -a             Append Sender ID to filename               (invalid in rsync mode)
+#      -A/--rsopt     set rsync option, default is "auz".        (invalid in common mode, using it with caution)
+#      -i/--interval  set rsync interval, default is 300.        (invalid in common mode)
+#      -n             Specify Tunnel Name                        (invalid in rsync mode)
+#      -r             Specify Filter pattern
+#      -R/--rsync     use rsync module
+#      -s             Specify Sender ID                          (invalid in rsync mode)
+#      -t      spawn time out in seconds, 0 indicates no time out. If single file size is larger than 1G, you need to specify a larger time out. default is 600
+
+#Note:
+#tunnelName must be unique
+#please make sure that NO FILE in this bin direcotry matches the Pattern you specified
+#example_tunnel -r [0-9]* 172.24.29.242 tuser Tpassword /data5/ttest_spider/testSrc/ /data5/ttest_spider/testDst/    
+
+
+#rsync example
+shopping_rsync_tunnel_1 -R -A "-auz" -i 10 -r *.gz 172.24.29.204 tuser Tpassword /src_full_path /dst_full_path

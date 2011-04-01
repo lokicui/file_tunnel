@@ -1,0 +1,5 @@
+1. Add you configuration to allFileTunnel.conf
+2. check cronolog symbol link in right OS version.
+3. Add one line to crontab, like this:
+
+*/10 * * * * cd /data7/tshopping_spider/sender/bin; ./checkAllFileTunnel.sh >> /dev/null 2>&1
