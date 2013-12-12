@@ -1,7 +1,7 @@
 #!/bin/sh
 
 
-process_list=('fileTunnel.py'\
+process_list=('fileTunnel'\
                )
 
 function stop_all_tunnel()
