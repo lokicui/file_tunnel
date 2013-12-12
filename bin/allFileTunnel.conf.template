@@ -5,7 +5,7 @@
 #
 #SYNOPSIS
 #       [LSRC means local src,RDEST means remote dest]
-#       [COMMON MODE] 
+#       [COMMON MODE]
 #           fileTunnel [options]... LSRC->RDEST                    RDEST_PASSWD
 #           fileTunnel [options]... RSRC->LDEST                    RSRC_PASSWD
 #       [MULTI-MASTER MODE]
@@ -24,14 +24,14 @@
 #      -n             Specify Tunnel Name                         (No default value, must be unique)
 #      --option       Set extral option, default is "az".         (default value='az',changing it with caution)
 #      --backupdir    Set backupdir, default is 'sending_dir/.bak/date.today()'
-#      -r             Specify Filter pattern, default is '*'                        
-#      -t             Spawn time out in seconds, 0 indicates no time out. 
+#      -r             Specify Filter pattern, default is '*'
+#      -t             Spawn time out in seconds, 0 indicates no time out.
 #                     [If single file size is larger than 32M, you need to specify a larger time out. default is 600]
 
 #Note:
 #tunnelName must be unique
 #please make sure that NO FILE in this bin direcotry matches the Pattern you specified
-#master-master-example -a 'appname' /data/test->tdiscuz@10.151.130.150#36000:/data/test&tdiscuz@10.151.130.150#36000:/data/test2 T0iscuz|T0iscuz
-#master-backup-example -a 'appname' /data/test->tdiscuz@10.151.130.150#36000:/data/test|tdiscuz@10.151.130.150#36000:/data/test2 T0iscuz|T0iscuz
+#master-master-example -a 'appname' /data/test->tdiscuz@10.151.130.150#36000:/data/test&tdiscuz@10.151.130.150#36000:/data/test2 passwd|passwd
+#master-backup-example -a 'appname' /data/test->tdiscuz@10.151.130.150#36000:/data/test|tdiscuz@10.151.130.150#36000:/data/test2 passwd|passwd
 
 
