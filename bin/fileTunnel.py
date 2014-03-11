@@ -7,6 +7,7 @@ import fcntl
 import getopt
 import re
 import time
+import pdb
 import random
 from datetime import datetime, date, timedelta
 sys.path.append('../common')
@@ -61,7 +62,7 @@ class BaseTunnel(object):
             self._backupdir = '.bak/%Y-%m-%d/%H'
             self._islocal = False
             self._user = ''
-            self._port = 36000
+            self._port = None
             self._passwd = passwd
             self._string = string
             self.init()
@@ -114,19 +115,22 @@ class BaseTunnel(object):
 
         def host(self):
             return self._host
-        
+
         def uhost(self):
-            return '%s@%s#%d' % (self._user, self._host, self._port)
+            if self._port:
+                return '%s@%s#%d' % (self._user, self._host, self._port)
+            else:
+                return '%s@%s' % (self._user, self._host)
 
         def dest(self):
             return str(self)
 
         def __str__(self):
             return self._string
-    
+
     def __init__(self):
         self._lockfd = open('.lock', 'w')
-    
+
     def makedirs(self, path):
         ret = True
         fcntl.flock(self._lockfd, fcntl.LOCK_EX)
@@ -148,7 +152,7 @@ class PushTunnel(BaseTunnel):
             Only support master-backup mode, no master-master mode
             That means only one machine can receive data at a time. In master-backup mode, we will try
             sending data to backup machine if we found master is down.
-            
+
             local->remote means push
             remote->local means pull
     '''
@@ -164,7 +168,7 @@ class PushTunnel(BaseTunnel):
         self._mode = conf.mode
         self._extral_options = conf.extral_options
         self._flush_interval = conf.flush_interval
-        
+
         assert len(self._src_nodes) == 1
         assert len(self._dest_nodes) >= 1
 
@@ -176,7 +180,7 @@ class PushTunnel(BaseTunnel):
 
     def find_alive_nodes(self):
         '''
-        iterating destination nodes and find one which still alive 
+        iterating destination nodes and find one which still alive
         '''
         alive_nodes = []
         for node in self._dest_nodes:
@@ -216,13 +220,13 @@ class PushTunnel(BaseTunnel):
 
     def filter(self):
         return self._filter
-    
+
     def ssh(self):
         return self._ssh
 
     def stop(self):
         self._stop = True
-    
+
     def sending_dir(self):
         '''
         return current sending direction && create it if dones't exist
@@ -277,7 +281,7 @@ class PushTunnel(BaseTunnel):
         if not os.path.isdir(backupdir):
             self.makedirs(backupdir)
         return self.ssh().rsync(self.sending_dir() + '/', backupdir, None, self._timeout, '-az --remove-sent-files --inplace')
-    
+
     def _can_trigger(self):
         return not self._stop
 
@@ -315,7 +319,7 @@ class RsyncPullTunnel(BaseTunnel):
         self._extral_options = conf.extral_options
         self._flush_interval = conf.flush_interval
         self._start_time = conf.start_time
-        
+
         assert len(self._src_nodes) >= 1
         assert len(self._dest_nodes) == 1
 
@@ -327,7 +331,7 @@ class RsyncPullTunnel(BaseTunnel):
 
     def find_alive_nodes(self):
         '''
-        iterating destination nodes and find one which still alive 
+        iterating destination nodes and find one which still alive
         '''
         alive_nodes = []
         for node in self._src_nodes:
@@ -344,7 +348,7 @@ class RsyncPullTunnel(BaseTunnel):
             yield node
             if self._mode & MODE_OR:
                 break
-    
+
     def select_one_disk(self, blacklist=[r'/data']):
         blacklist.append(self.view_disk())
         pattern = re.compile(r'/data\d+', re.I)
@@ -377,7 +381,7 @@ class RsyncPullTunnel(BaseTunnel):
         disk_avail_items = sorted(disk_avail_ratio.items(), key=lambda item:item[1], reverse=True)
         selected_disk_item = random.sample(disk_avail_items[:len(disk_avail_items)/2 + 1], 1)[0]
         return selected_disk_item[0]
-    
+
     def view_disk(self):
         return r'/data1'
 
@@ -386,7 +390,7 @@ class RsyncPullTunnel(BaseTunnel):
             tm = time.localtime()
         dir = self._dest_nodes[0].dir(tm, False).replace(r'$SRCIP', node.host())
         view_dir = dir.replace(r'/$dataN', self.view_disk())
-        #Return True if path is an existing directory. 
+        #Return True if path is an existing directory.
         #This follows symbolic links, so both islink() and isdir() can be true for the same path.
         if os.path.isdir(view_dir):
             return view_dir
@@ -397,7 +401,7 @@ class RsyncPullTunnel(BaseTunnel):
         elif os.path.isfile(view_dir):
             os.remove(view_dir)
 
-        #create view parent dir 
+        #create view parent dir
         view_parent_dir = os.path.split(view_dir)[0]
         if not os.path.isdir(view_parent_dir):
             self.makedirs(view_parent_dir)
@@ -414,7 +418,7 @@ class RsyncPullTunnel(BaseTunnel):
         log(INFO, 'symlink(%s, %s)' % (dest_dir, view_dir))
         assert os.path.islink(view_dir)
         return view_dir
-    
+
     def sending_path(self, node, tm=None):
         '''
         if sending_path didn't exist, there is no need to create it
@@ -438,7 +442,7 @@ class RsyncPullTunnel(BaseTunnel):
 
     def filter(self):
         return self._filter
-    
+
     def ssh(self):
         return self._ssh
 
@@ -447,7 +451,7 @@ class RsyncPullTunnel(BaseTunnel):
 
     def task_time(self):
         return time.time() - self._timeout
-    
+
 
     def _pull(self, node, option, tm):
         '''
@@ -457,7 +461,7 @@ class RsyncPullTunnel(BaseTunnel):
         return success or not
         '''
         return self.ssh().rsync(self.sending_path(node, tm), self.dest_dir(node, tm), node.passwd(), self._timeout, option)
-    
+
     def _can_trigger(self):
         if self._start_time is not None and not self._stop:
             #waiting until can trigger
@@ -537,7 +541,7 @@ NAME
 
 SYNOPSIS
        [LSRC means local src,RDEST means remote dest]
-       [COMMON MODE] 
+       [COMMON MODE]
            %s [options]... LSRC->RDEST                    RDEST_PASSWD
            %s [options]... RSRC->LDEST                    RSRC_PASSWD
        [MULTI-MASTER MODE]
@@ -557,8 +561,8 @@ DESCRIPTION
       -n             Specify Tunnel Name                         (No default value, must be unique)
       --option       Set extral option, default is "az".         (default value='az',changing it with caution)
       --backupdir    Set backupdir, default is 'sending_dir/.bak/date.today()'
-      -r             Specify Filter pattern, default is '*'                        
-      -t             Spawn time out in seconds, 0 indicates no time out. 
+      -r             Specify Filter pattern, default is '*'
+      -t             Spawn time out in seconds, 0 indicates no time out.
                      [If single file size is larger than 32M, you need to specify a larger time out. default is 600]
       ''' % ((pname,)*10)
     print usage_str

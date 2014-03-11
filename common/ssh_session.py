@@ -17,7 +17,7 @@ class SSHSession:
         self._verbose = verbose
         self._SSH_OPTS = "-o 'RSAAuthentication=no' -o 'PubkeyAuthentication=no'"
         self._re = re.compile(r'(.{1,256})@(\d{1,3}.\d{1,3}.\d{1,3}.\d{1,3})#*(\d*)')
-    
+
     def __exec(self, cmd, timeout):
         if not timeout or timeout <= 0:
             timeout = -1
@@ -103,7 +103,7 @@ class SSHSession:
                     return None
 
         return  not child.exitstatus
-    
+
     def __parse_cmd(self, cmd):
         #tshopping@172.24.32.248#36000:/data1/tshp1/xxx
         success = False
@@ -124,25 +124,31 @@ class SSHSession:
                 break
         return success
 
-    
+
     def __ssh_command (self, remote_cmd, dest_info, passwd, timeout):
-        ''' 
+        '''
         This runs a command on the remote host. This could also be done with the
         pxssh class, but this demonstrates what that class does at a simpler level.
         This returns a pexpect.spawn object. This handles the case when you try to
         connect to a new host and ssh asks you if you want to accept the public key
-        fingerprint and continue connecting. 
+        fingerprint and continue connecting.
         '''
         assert self.set_passwd(passwd)
         assert self.__parse_cmd(dest_info)
-        cmd = 'ssh -q %s -p%s -l "%s" "%s" "%s"' % (self._SSH_OPTS, self._port, self._user, self._host, remote_cmd)
+        if self._port:
+            cmd = 'ssh -q %s -p%s -l "%s" "%s" "%s"' % (self._SSH_OPTS, self._port, self._user, self._host, remote_cmd)
+        else:
+            cmd = 'ssh -q %s -l "%s" "%s" "%s"' % (self._SSH_OPTS, self._user, self._host, remote_cmd)
         #print cmd
         return self.__exec(cmd, timeout)
 
     def __scp(self, src_path, dst_path, passwd, timeout):
         assert self.set_passwd(passwd)
         assert self.__parse_cmd('%s\t%s' % (src_path, dst_path))
-        cmd = 'scp -q %s -P %s %s %s' % (self._port, self._SSH_OPTS, src_path, dst_path)
+        if self._port:
+            cmd = 'scp -q %s -P %s %s %s' % (self._SSH_OPTS, self._port, src_path, dst_path)
+        else:
+            cmd = 'scp -q %s %s %s' % (self._SSH_OPTS, src_path, dst_path)
         return self.__exec(cmd, timeout)
 
     def __rsync(self, src_path, dst_path, passwd, timeout, option):
@@ -155,7 +161,7 @@ class SSHSession:
             print cmd
             assert self.__parse_cmd(cmd)
         return self.__exec(cmd, timeout)
-        
+
     def set_passwd(self, passwd):
         if passwd:
             self._password = passwd
