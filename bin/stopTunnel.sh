@@ -8,7 +8,8 @@ function stop_all_tunnel()
 {
     num=0
     process_name=$1
-    pid_list=`ps -ef | grep $process_name | grep -v grep | grep -v "vi $process_name" | awk '{print $2}'`
+    #pid_list=`ps -ef | grep $process_name | grep -v grep | grep -v "vi $process_name" | awk '{print $2}'`
+    pid_list=`pgrep -f "(^|/)$process_name($| ).*"`
     for pid in $pid_list
     do
         kill $pid;
@@ -24,7 +25,8 @@ function stop_one_tunnel()
     num=0
     process_name=$1
     tunnel_name_=$2
-    pid_list=`ps -ef | grep "$process_name" | grep "$tunnel_name_" | grep -v grep | grep -v "vi $process_name" | awk '{print $2}'`
+    #pid_list=`ps -ef | grep "$process_name" | grep "$tunnel_name_" | grep -v grep | grep -v "vi $process_name" | awk '{print $2}'`
+    pid_list=`pgrep -f "(^|/)$process_name($| ).*${tunnel_name_}"`
     for pid in $pid_list
     do
         kill $pid

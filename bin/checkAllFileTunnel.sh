@@ -40,12 +40,14 @@ do
     if ([ -z "$name" ]  || [ -z "$args" ]);then
         continue
     fi
-    if [ -z "`ps -ef |grep "$name" | grep "$myExec" | grep -v grep`" ] ; then
+    if ! pgrep -f "(^|/)$myExec($| ).*$name" > /dev/null; then
+    #if [ -z "`ps -ef |grep "$name" | grep "$myExec" | grep -v grep`" ] ; then
         ./nhclstart.sh "./$myExec -n $name $args" "$name"
         ret=$?
         echo "`date +'%Y-%m-%d %T'` ${name} restarted, status($ret)" >>../log/restart.log
         starting_num=$((starting_num+1))
-        if ! [ -z "`ps -ef |grep "$name" | grep "$myExec" | grep -v grep`" ] ; then
+        #if ! [ -z "`ps -ef |grep "$name" | grep "$myExec" | grep -v grep`" ] ; then
+        if pgrep -f "(^|/)$myExec($| ).*$name" > /dev/null; then
             success_start_num=$((success_start_num+1))
         fi
     else
