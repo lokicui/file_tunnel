@@ -1,4 +1,4 @@
-#!/usr/bin/python2.4
+#!/usr/bin/python
 #encoding=GBK
 
 import os
@@ -42,7 +42,8 @@ class TunnelConfItem(object):
         self.timeout = 600.0
         self.flush_interval = 1.0
         self.start_time = None
-        self.backup_dir = ''
+        self.backup_pattern = '%Y-%m-%d/%H'
+        self.bak_days = 30
 
         self.mode = MODE_UNKNOWN
         self.src_nodes = []
@@ -57,9 +58,9 @@ class BaseTunnel(object):
         '''
 
         def __init__(self, string, passwd):
+            self._ssh = SSHSession(cout=sys.stderr)
             self._host = ''
             self._dir = ''
-            self._backupdir = '.bak/%Y-%m-%d/%H'
             self._islocal = False
             self._user = ''
             self._port = None
@@ -82,22 +83,28 @@ class BaseTunnel(object):
                     self._dir = m.group(4).rstrip(r'/')
                 assert self._passwd
 
-        def is_alive(self, ssh):
+        def is_alive(self):
             if not self._islocal:
                 dir = self._dir
                 assert dir.startswith('/')
-                root_dir = dir[:dir.find('/', 1)]
-                return self.ssh_cmd(ssh, '[ -r %s ]' % root_dir)
+                #root_dir = dir[:dir.find('/', 1)]
+                dir = time.strftime(self._dir, time.localtime())
+                self.ssh_cmd('mkdir -p %s' % dir)
+                return self.ssh_cmd('[ -r %s ]' % dir)
             return True
 
-        def ssh_cmd(self, ssh, cmd):
-            return ssh.ssh_cmd(self.uhost(), cmd, self.passwd(), timeout=5)
-
-        def backupdir(self, tm=None):
+        def ssh_cmd(self, cmd):
+            return self._ssh.ssh_cmd(self.uhost(), cmd, self.passwd(), timeout=5)
+        
+        def get_bak_basedir(self, tm=None):
             if not tm:
                 tm = time.localtime()
-            backupdir = time.strftime(self._backupdir, tm)
-            return os.path.join(self.dir(tm), backupdir)
+            return os.path.join(self.dir(tm), '.bak/')
+
+        def fmtbackupdir(self, backupdir_pattern, tm=None):
+            if not tm:
+                tm = time.localtime()
+            return time.strftime('%s/%s' % (self.get_bak_basedir(tm), backupdir_pattern), tm)
 
         def dir(self, tm=None, create_dir=True):
             if not tm:
@@ -162,12 +169,13 @@ class PushTunnel(BaseTunnel):
         self._appname = conf.appname
         self._src_nodes = conf.src_nodes
         self._dest_nodes = conf.dest_nodes
-        self._backup_dir = conf.backup_dir
+        self._backup_pattern = conf.backup_pattern
         self._filter = conf.filter
         self._timeout = conf.timeout
         self._mode = conf.mode
         self._extral_options = conf.extral_options
         self._flush_interval = conf.flush_interval
+        self._bak_days = conf.bak_days
 
         assert len(self._src_nodes) == 1
         assert len(self._dest_nodes) >= 1
@@ -184,7 +192,7 @@ class PushTunnel(BaseTunnel):
         '''
         alive_nodes = []
         for node in self._dest_nodes:
-            if node.is_alive(self.ssh()):
+            if node.is_alive():
                 alive_nodes.append(node)
             else:
                 log(ERROR, 'host(%s) dead!' % node.uhost())
@@ -198,10 +206,8 @@ class PushTunnel(BaseTunnel):
             if self._mode & MODE_OR:
                 break
 
-    def backupdir(self):
-        if self._backup_dir:
-            return self._backup_dir
-        return self._src_nodes[0].backupdir()
+    def get_backupdir(self):
+        return self._src_nodes[0].fmtbackupdir(self._backup_pattern)
 
     def src_dir(self):
         return str(self._src_nodes[0].dir())
@@ -235,6 +241,15 @@ class PushTunnel(BaseTunnel):
         if not os.path.isdir(local_sending_dir):
             self.makedirs(local_sending_dir)
         return local_sending_dir
+    
+    def _rotate_backup(self):
+        dir = self._src_nodes[0].get_bak_basedir()
+        if dir and os.path.isdir(dir):
+            cmd = 'find %s -ctime +%s -delete' % (dir, self._bak_days)
+            log(INFO, 'CMD[%s] execute success!' % cmd)
+            return os.system(cmd)
+        return False
+
 
     def _init_local_sending_dir(self):
         '''
@@ -277,7 +292,7 @@ class PushTunnel(BaseTunnel):
         return self.ssh().rsync(self.sending_dir() + '/', node.dir(), node.passwd(), self._timeout, option)
 
     def _backup(self):
-        backupdir = self.backupdir()
+        backupdir = self.get_backupdir()
         if not os.path.isdir(backupdir):
             self.makedirs(backupdir)
         return self.ssh().rsync(self.sending_dir() + '/', backupdir, None, self._timeout, '-az --remove-sent-files --inplace')
@@ -296,6 +311,7 @@ class PushTunnel(BaseTunnel):
                         break
                 else:
                     assert self._backup()
+                    self._rotate_backup()
                     log(INFO, 'sleep %ds...' % self._flush_interval)
                     time.sleep(self._flush_interval)
             else:
@@ -312,13 +328,14 @@ class RsyncPullTunnel(BaseTunnel):
         self._appname = conf.appname
         self._src_nodes = conf.src_nodes
         self._dest_nodes = conf.dest_nodes
-        self._backup_dir = conf.backup_dir
+        self._backup_pattern = conf.backup_pattern
         self._filter = conf.filter
         self._timeout = conf.timeout
         self._mode = conf.mode
         self._extral_options = conf.extral_options
         self._flush_interval = conf.flush_interval
         self._start_time = conf.start_time
+        self._bak_days = conf.bak_days
 
         assert len(self._src_nodes) >= 1
         assert len(self._dest_nodes) == 1
@@ -335,7 +352,7 @@ class RsyncPullTunnel(BaseTunnel):
         '''
         alive_nodes = []
         for node in self._src_nodes:
-            if node.is_alive(self.ssh()):
+            if node.is_alive():
                 alive_nodes.append(node)
             else:
                 log(ERROR, 'host(%s) dead!' % node.uhost())
@@ -557,10 +574,11 @@ SYNOPSIS
 
 DESCRIPTION
       -a             Append suffix to filename.                  (default value=os.uname()[1])
+      -b             Set backup rotate days. default is 30.      (bak files older then setting will be deleted)
       -i             Set rsync/push/pull interval,default is 1.  (There is no need to change the default value)
       -n             Specify Tunnel Name                         (No default value, must be unique)
       --option       Set extral option, default is "az".         (default value='az',changing it with caution)
-      --backupdir    Set backupdir, default is 'sending_dir/.bak/date.today()'
+      --bakpattern   Set backupdir pattern, default is 'sending_dir/.bak/bakpattern(%Y-%m-%d/%H)'
       -r             Specify Filter pattern, default is '*'
       -t             Spawn time out in seconds, 0 indicates no time out.
                      [If single file size is larger than 32M, you need to specify a larger time out. default is 600]
@@ -614,7 +632,7 @@ def test():
 
 if __name__ == '__main__':
     try:
-        lstOpt, lstArg = getopt.gnu_getopt(sys.argv[1:], "s:n:r:t:i:a:", ['backupdir=', 'option=', 'rsync'])
+        lstOpt, lstArg = getopt.gnu_getopt(sys.argv[1:], "s:n:r:t:i:a:b:", ['bakpattern=', 'option=', 'rsync'])
     except getopt.GetoptError, err:
         print str(err) # will print something like "option -a not recognized"
         usage(sys.argv[0])
@@ -628,6 +646,10 @@ if __name__ == '__main__':
             conf.filter = value.strip("'").strip('"')
         elif option == '-a':
             conf.appname = value.strip("'").strip('"')
+        elif option == '-b':
+            bak_days = value.strip("'").strip('"')
+            if bak_days.isdigit():
+                conf.bak_days = int(bak_days)
         elif option == '-s':
             conf.start_time = value.strip("'").strip('"')
         elif option == '-t':
@@ -638,8 +660,8 @@ if __name__ == '__main__':
             conf.flush_interval = float(value)
         elif option == '--option':
             conf.extral_options.append(value.strip("'").strip('"'))
-        elif option == '--backupdir':
-            conf.backup_dir = value.strip("'").strip('"')
+        elif option == '--bakpattern':
+            conf.backup_pattern = '.bak/' + value.strip("'").strip('"')
         elif option == '--rsync':
             conf.mode |= MODE_RSYNC
 
