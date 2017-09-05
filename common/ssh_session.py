@@ -27,7 +27,8 @@ class SSHSession:
                 '(yes/no).*':'yes\r\n'})
         if is_timeout:
             return False
-        return not exitstatus
+        #print 'child_result=', child_result, exitstatus
+        return (exitstatus == 0)
 
     def __exec_old(self, cmd, timeout):
         import pexpect
@@ -158,7 +159,7 @@ class SSHSession:
         #print cmd
         if passwd:
             assert self.set_passwd(passwd)
-            print cmd
+            #print cmd
             assert self.__parse_cmd(cmd)
         return self.__exec(cmd, timeout)
 

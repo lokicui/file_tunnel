@@ -68,6 +68,9 @@ class BaseTunnel(object):
             self._string = string
             self.init()
 
+        def __str__(self):
+            return self._string
+
         def init(self):
             if self._string.find('@') == -1:
                 self._islocal = True
@@ -295,7 +298,7 @@ class PushTunnel(BaseTunnel):
         backupdir = self.get_backupdir()
         if not os.path.isdir(backupdir):
             self.makedirs(backupdir)
-        return self.ssh().rsync(self.sending_dir() + '/', backupdir, None, self._timeout, '-az --remove-sent-files --inplace')
+        return self.ssh().rsync(self.sending_dir() + '/', backupdir, None, self._timeout, '-az --remove-sent-files --remove-source-files --inplace')
 
     def _can_trigger(self):
         return not self._stop
@@ -308,8 +311,10 @@ class PushTunnel(BaseTunnel):
             if self._init_local_sending_dir():
                 for node in self.alive_valid_nodes():
                     if not self._push(node, self.options()):
+                        log(ERROR, 'push to node[%s] failed' % node)
                         break
                 else:
+                    log(INFO, 'push to node[%s] success' % node)
                     assert self._backup()
                     self._rotate_backup()
                     log(INFO, 'sleep %ds...' % self._flush_interval)
